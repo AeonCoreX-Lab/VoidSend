@@ -1,0 +1,333 @@
+# GraphQL Schema for VoidSend
+
+type Query {
+  # Email queries
+  email(id: ID!): Email
+  emails(userId: ID!, limit: Int = 10, offset: Int = 0): [Email!]!
+  
+  # Template queries
+  template(action: String!): Template
+  templates: [Template!]!
+  
+  # Analytics queries
+  analytics(dateRange: DateRangeInput!): Analytics!
+  userAnalytics(userId: ID!, dateRange: DateRangeInput!): UserAnalytics!
+  
+  # Health check
+  health: HealthStatus!
+}
+
+type Mutation {
+  # Email mutations
+  dispatchEmail(input: DispatchInput!): DispatchPayload!
+  dispatchBatch(input: BatchDispatchInput!): BatchDispatchPayload!
+  scheduleEmail(input: ScheduleInput!): ScheduledJob!
+  cancelScheduled(jobId: ID!): Boolean!
+  
+  # Template mutations
+  createTemplate(input: TemplateInput!): Template!
+  updateTemplate(action: ID!, input: TemplateInput!): Template!
+  deleteTemplate(action: ID!): Boolean!
+  
+  # Webhook mutations
+  registerWebhook(input: WebhookInput!): Webhook!
+  updateWebhook(id: ID!, input: WebhookInput!): Webhook!
+  deleteWebhook(id: ID!): Boolean!
+}
+
+type Subscription {
+  # Real-time updates
+  emailStatus(jobId: ID!): EmailStatusUpdate!
+  dispatchEvents: DispatchEvent!
+  systemAlerts(severity: [String!]): SystemAlert!
+}
+
+# Types
+type Email {
+  id: ID!
+  userId: String!
+  action: String!
+  status: EmailStatus!
+  provider: String
+  messageId: String
+  data: JSON!
+  priority: Int!
+  retryCount: Int!
+  maxRetries: Int!
+  scheduledAt: Time
+  createdAt: Time!
+  updatedAt: Time!
+  completedAt: Time
+  error: String
+  metadata: EmailMetadata
+}
+
+type EmailMetadata {
+  openedAt: Time
+  clickedAt: Time
+  bouncedAt: Time
+  complainedAt: Time
+  deliveryTime: Float
+  userAgent: String
+  ipAddress: String
+  location: Location
+}
+
+type Location {
+  country: String
+  city: String
+  latitude: Float
+  longitude: Float
+}
+
+type Template {
+  id: ID!
+  name: String!
+  action: String!
+  subject: String!
+  htmlContent: String!
+  textContent: String
+  variables: [String!]!
+  version: Int!
+  isActive: Boolean!
+  createdBy: String
+  createdAt: Time!
+  updatedAt: Time!
+}
+
+type Analytics {
+  dateRange: DateRange!
+  total: AnalyticsTotal!
+  trends: AnalyticsTrends!
+  providers: [ProviderStats!]!
+  actions: [ActionStats!]!
+  hourly: [HourlyStats!]!
+}
+
+type AnalyticsTotal {
+  sent: Int!
+  delivered: Int!
+  opened: Int!
+  clicked: Int!
+  bounced: Int!
+  complained: Int!
+  failed: Int!
+}
+
+type AnalyticsTrends {
+  sentChange: Float!
+  deliveredChange: Float!
+  openedRate: Float!
+  clickRate: Float!
+  bounceRate: Float!
+}
+
+type ProviderStats {
+  name: String!
+  count: Int!
+  successRate: Float!
+  avgDeliveryTime: Float!
+}
+
+type ActionStats {
+  action: String!
+  count: Int!
+  successRate: Float!
+}
+
+type HourlyStats {
+  hour: String!
+  sent: Int!
+  delivered: Int!
+}
+
+type UserAnalytics {
+  userId: ID!
+  totalEmails: Int!
+  lastEmailAt: Time
+  preferredAction: String
+  engagement: UserEngagement!
+}
+
+type UserEngagement {
+  openRate: Float!
+  clickRate: Float!
+  avgResponseTime: Float
+}
+
+type HealthStatus {
+  status: String!
+  version: String!
+  uptime: Float!
+  timestamp: Time!
+  components: ComponentHealth!
+}
+
+type ComponentHealth {
+  database: ComponentStatus!
+  redis: ComponentStatus!
+  queue: ComponentStatus!
+  providers: [ProviderHealth!]!
+}
+
+type ComponentStatus {
+  status: String!
+  latency: Float!
+  message: String
+}
+
+type ProviderHealth {
+  name: String!
+  status: String!
+  latency: Float!
+  rateLimit: RateLimitInfo
+}
+
+type RateLimitInfo {
+  remaining: Int!
+  resetAt: Time!
+}
+
+type DispatchPayload {
+  jobId: ID!
+  status: String!
+  estimatedTime: Float!
+  message: String!
+}
+
+type BatchDispatchPayload {
+  batchId: ID!
+  total: Int!
+  accepted: Int!
+  rejected: Int!
+  jobs: [JobStatus!]!
+}
+
+type JobStatus {
+  index: Int!
+  jobId: ID!
+  status: String!
+  error: String
+}
+
+type ScheduledJob {
+  id: ID!
+  userId: String!
+  action: String!
+  scheduledAt: Time!
+  repeat: String
+  endAt: Time
+  status: String!
+}
+
+type Webhook {
+  id: ID!
+  url: String!
+  events: [String!]!
+  secret: String
+  isActive: Boolean!
+  createdAt: Time!
+}
+
+type EmailStatusUpdate {
+  jobId: ID!
+  status: EmailStatus!
+  provider: String
+  messageId: String
+  timestamp: Time!
+  metadata: JSON
+}
+
+type DispatchEvent {
+  type: String!
+  jobId: ID!
+  data: JSON!
+  timestamp: Time!
+}
+
+type SystemAlert {
+  id: ID!
+  severity: String!
+  title: String!
+  message: String!
+  data: JSON!
+  timestamp: Time!
+}
+
+# Inputs
+input DispatchInput {
+  userId: String!
+  action: String!
+  data: JSON
+  priority: Int = 5
+  scheduledAt: Time
+  provider: String
+  tags: [String!]
+}
+
+input BatchDispatchInput {
+  jobs: [DispatchInput!]!
+}
+
+input ScheduleInput {
+  userId: String!
+  action: String!
+  data: JSON
+  scheduleAt: Time!
+  repeat: RepeatType
+  endAt: Time
+}
+
+input TemplateInput {
+  name: String!
+  action: String!
+  subject: String!
+  htmlContent: String!
+  textContent: String
+  variables: [String!]
+}
+
+input WebhookInput {
+  url: String!
+  events: [String!]!
+  secret: String
+}
+
+input DateRangeInput {
+  startDate: Time!
+  endDate: Time!
+  timezone: String = "UTC"
+}
+
+# Enums
+enum EmailStatus {
+  PENDING
+  PROCESSING
+  SENT
+  DELIVERED
+  OPENED
+  CLICKED
+  BOUNCED
+  COMPLAINED
+  FAILED
+  CANCELLED
+}
+
+enum RepeatType {
+  HOURLY
+  DAILY
+  WEEKLY
+  MONTHLY
+  YEARLY
+}
+
+# Scalars
+scalar Time
+scalar JSON
+scalar Date
+
+# Types for responses
+type DateRange {
+  startDate: Time!
+  endDate: Time!
+}

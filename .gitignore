@@ -1,0 +1,13 @@
+# Binaries
+bin/
+VoidSend
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Config files (CRITICAL SECURITY)
+config/config.yaml
+
+# Go modules
+vendor/

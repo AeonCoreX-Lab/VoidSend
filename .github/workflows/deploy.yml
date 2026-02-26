@@ -1,0 +1,305 @@
+name: Deploy VoidSend Ultra Engine
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  release:
+    types: [ published ]
+
+env:
+  GO_VERSION: '1.21'
+  DOCKER_REGISTRY: ghcr.io
+  DOCKER_IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: voidsend
+          POSTGRES_PASSWORD: voidsend
+          POSTGRES_DB: voidsend_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        cache: true
+
+    - name: Install dependencies
+      run: go mod download
+
+    - name: Run linters
+      uses: golangci/golangci-lint-action@v3
+      with:
+        version: latest
+        args: --timeout=5m
+
+    - name: Run unit tests
+      run: go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
+      env:
+        DATABASE_URL: postgresql://voidsend:voidsend@localhost:5432/voidsend_test?sslmode=disable
+        REDIS_URL: redis://localhost:6379
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.txt
+        flags: unittests
+
+    - name: Run security scan
+      uses: securego/gosec@master
+      with:
+        args: ./...
+
+  build:
+    name: Build and Package
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+
+    - name: Build binary
+      run: |
+        GOOS=linux GOARCH=amd64 go build -o voidsend-linux-amd64 main.go
+        GOOS=linux GOARCH=arm64 go build -o voidsend-linux-arm64 main.go
+        GOOS=darwin GOARCH=amd64 go build -o voidsend-darwin-amd64 main.go
+        GOOS=windows GOARCH=amd64 go build -o voidsend-windows-amd64.exe main.go
+
+    - name: Upload binaries
+      uses: actions/upload-artifact@v3
+      with:
+        name: voidsend-binaries
+        path: |
+          voidsend-*
+        retention-days: 7
+
+  docker:
+    name: Build and Push Docker Image
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v2
+      with:
+        registry: ${{ env.DOCKER_REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v4
+      with:
+        images: ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=sha,format=long
+          type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v4
+      with:
+        context: .
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        platforms: linux/amd64,linux/arm64
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Scan Docker image for vulnerabilities
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE_NAME }}:latest
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+        severity: 'CRITICAL,HIGH'
+
+    - name: Upload Trivy results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  # Optional: Staging deployment (requires SSH secrets)
+  # deploy-staging:
+  #   name: Deploy to Staging
+  #   needs: [build, docker]
+  #   runs-on: ubuntu-latest
+  #   if: github.ref == 'refs/heads/develop'
+  #   environment: staging
+  #   steps:
+  #   - name: Deploy to staging server
+  #     uses: appleboy/ssh-action@v0.1.5
+  #     with:
+  #       host: ${{ secrets.STAGING_HOST }}
+  #       username: ${{ secrets.STAGING_USER }}
+  #       key: ${{ secrets.STAGING_SSH_KEY }}
+  #       script: |
+  #         cd /opt/voidsend
+  #         docker-compose pull
+  #         docker-compose up -d
+  #         docker system prune -f
+
+  #   - name: Run smoke tests
+  #     run: |
+  #       curl -f http://${{ secrets.STAGING_HOST }}/health || exit 1
+
+  # Production deployment (requires SSH secrets)
+  # deploy-production:
+  #   name: Deploy to Production
+  #   needs: [build, docker, deploy-staging]
+  #   runs-on: ubuntu-latest
+  #   if: github.ref == 'refs/heads/main'
+  #   environment: production
+  #   steps:
+  #   - name: Deploy to production servers
+  #     uses: appleboy/ssh-action@v0.1.5
+  #     with:
+  #       host: ${{ secrets.PROD_HOST }}
+  #       username: ${{ secrets.PROD_USER }}
+  #       key: ${{ secrets.PROD_SSH_KEY }}
+  #       script: |
+  #         cd /opt/voidsend
+  #         docker-compose pull
+  #         docker-compose up -d
+  #         docker system prune -f
+
+  #   - name: Health check
+  #     run: |
+  #       for i in {1..10}; do
+  #         if curl -f http://${{ secrets.PROD_HOST }}/health; then
+  #           exit 0
+  #         fi
+  #         sleep 10
+  #       done
+  #       exit 1
+
+  #   - name: Notify deployment success
+  #     uses: slackapi/slack-github-action@v1.24.0
+  #     with:
+  #       payload: |
+  #         {
+  #           "text": "✅ VoidSend deployed to production successfully!",
+  #           "blocks": [
+  #             {
+  #               "type": "section",
+  #               "text": {
+  #                 "type": "mrkdwn",
+  #                 "text": "*🚀 Deployment Complete*\nVoidSend Ultra Engine version ${{ github.sha }} is now live in production!"
+  #               }
+  #             }
+  #           ]
+  #         }
+  #     env:
+  #       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+
+  release:
+    name: Create Release
+    needs: [build, docker]  # পরিবর্তন: deploy-production না থাকলে build ও docker-এর উপর নির্ভর করবে
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Generate release notes (simple)
+      run: |
+        echo "Release ${{ github.ref_name }}" > RELEASE_NOTES.md
+        echo "Changes:" >> RELEASE_NOTES.md
+        git log --pretty=format:"- %s" $(git describe --tags --abbrev=0 HEAD^)..HEAD >> RELEASE_NOTES.md
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        body_path: RELEASE_NOTES.md
+        files: |
+          voidsend-*
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  performance-test:
+    name: Performance Testing
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+
+    - name: Install k6
+      run: |
+        curl -s https://github.com/grafana/k6/releases/download/v0.44.1/k6-v0.44.1-linux-amd64.tar.gz | tar xz
+        sudo mv k6-v0.44.1-linux-amd64/k6 /usr/local/bin/
+
+    - name: Run performance tests (basic)
+      run: |
+        go run main.go &
+        sleep 5
+        echo "Running basic load test..."
+        k6 run <(echo '
+          import http from "k6/http";
+          import { check, sleep } from "k6";
+          export default function () {
+            let res = http.post("http://localhost:8080/v2/ultra-dispatch", JSON.stringify({
+              user_id: "test",
+              action: "welcome",
+              data: { name: "Performance" }
+            }), { headers: { "Content-Type": "application/json", "X-API-Key": "test" } });
+            check(res, { "status is 202": (r) => r.status === 202 });
+            sleep(1);
+          }
+        ') --vus 10 --duration 10s
+        pkill main

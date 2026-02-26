@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px 20px;
+            text-align: center;
+            border-radius: 10px 10px 0 0;
+        }
+        
+        .header h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+        
+        .content {
+            background: white;
+            padding: 40px 30px;
+            border-radius: 0 0 10px 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .welcome-message {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .welcome-message h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+        }
+        
+        .features {
+            display: flex;
+            justify-content: space-between;
+            margin: 30px 0;
+        }
+        
+        .feature {
+            flex: 1;
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .feature-icon {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 50%;
+            margin: 0 auto 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 24px;
+        }
+        
+        .cta-button {
+            display: inline-block;
+            padding: 15px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 30px;
+            font-weight: bold;
+            margin: 20px 0;
+        }
+        
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .social-links {
+            margin: 20px 0;
+        }
+        
+        .social-links a {
+            display: inline-block;
+            margin: 0 10px;
+            color: #667eea;
+            text-decoration: none;
+        }
+        
+        @media (max-width: 480px) {
+            .features {
+                flex-direction: column;
+            }
+            
+            .header h1 {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Welcome to AeonCoreX!</h1>
+            <p>Your journey to excellence begins here</p>
+        </div>
+        
+        <div class="content">
+            <div class="welcome-message">
+                <h2>Hello {{.User.name | default "there"}}!</h2>
+                <p>We're thrilled to have you on board. AeonCoreX is your gateway to powerful email automation and next-generation communication.</p>
+            </div>
+            
+            <div class="features">
+                <div class="feature">
+                    <div class="feature-icon">⚡</div>
+                    <h3>Lightning Fast</h3>
+                    <p>Emails delivered in milliseconds</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">🔒</div>
+                    <h3>Secure</h3>
+                    <p>End-to-end encryption</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">📊</div>
+                    <h3>Analytics</h3>
+                    <p>Real-time tracking & insights</p>
+                </div>
+            </div>
+            
+            <div style="text-align: center;">
+                <a href="https://aeoncorex.com/get-started" class="cta-button">
+                    Get Started Now →
+                </a>
+            </div>
+            
+            <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
+            
+            <p><strong>Quick Tips:</strong></p>
+            <ul style="margin-left: 20px; color: #666;">
+                <li>Complete your profile to personalize your experience</li>
+                <li>Check out our template gallery for stunning email designs</li>
+                <li>Connect with our community for tips and tricks</li>
+            </ul>
+            
+            <p style="margin-top: 20px;">Need help? Our support team is available 24/7 at <a href="mailto:support@aeoncorex.com">support@aeoncorex.com</a></p>
+        </div>
+        
+        <div class="footer">
+            <div class="social-links">
+                <a href="#">Twitter</a> •
+                <a href="#">LinkedIn</a> •
+                <a href="#">GitHub</a> •
+                <a href="#">Discord</a>
+            </div>
+            <p>© {{.Year}} AeonCoreX. All rights reserved.</p>
+            <p>123 Tech Street, Silicon Valley, CA 94025</p>
+            <p style="margin-top: 10px;">
+                <small>
+                    <a href="#">Unsubscribe</a> •
+                    <a href="#">Privacy Policy</a> •
+                    <a href="#">Terms of Service</a>
+                </small>
+            </p>
+        </div>
+    </div>
+</body>
+</html>
