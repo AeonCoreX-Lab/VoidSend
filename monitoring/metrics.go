@@ -57,6 +57,15 @@ type Metrics struct {
 	enabled bool
 }
 
+type EngineMetrics struct {
+	TotalJobs      int64
+	SuccessJobs    int64
+	FailedJobs     int64
+	AvgProcessTime time.Duration
+	QueueLength    int
+	ActiveWorkers  int
+}
+
 func init() {
 	logger = logrus.New()
 	logger.SetFormatter(&logrus.JSONFormatter{
@@ -154,6 +163,13 @@ func SetQueueSize(size int) {
 
 func IncRateLimitHit() {
 	rateLimitHits.Inc()
+}
+
+// ADDED: RecordMetrics function to record engine metrics
+func RecordMetrics(metrics *EngineMetrics) {
+	SetActiveJobs(metrics.ActiveWorkers)
+	SetQueueSize(metrics.QueueLength)
+	// You can also record other metrics as gauges if needed
 }
 
 // Middleware

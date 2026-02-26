@@ -32,11 +32,11 @@ func InitAlerts(config AlertConfig) {
 
 func SendAlert(alert Alert) {
 	// Log alert
-	logger.WithFields(map[string]interface{}{
+	LogAlert(alert.Message, map[string]interface{}{
 		"alert_id": alert.ID,
 		"severity": alert.Severity,
 		"title":    alert.Title,
-	}).Warn(alert.Message)
+	})
 
 	// Send to different channels based on severity
 	switch alert.Severity {
@@ -89,19 +89,19 @@ func sendPagerDutyAlert(alert Alert) {
 		"routing_key":  alertConfig.PagerDutyKey,
 		"event_action": "trigger",
 		"payload": map[string]interface{}{
-			"summary":  alert.Title,
-			"source":   "VoidSend",
-			"severity": alert.Severity,
-			"timestamp": alert.Timestamp.Format(time.RFC3339),
-			"component": "email-engine",
-			"group":     "production",
-			"class":     "email-delivery",
+			"summary":       alert.Title,
+			"source":        "VoidSend",
+			"severity":      alert.Severity,
+			"timestamp":     alert.Timestamp.Format(time.RFC3339),
+			"component":     "email-engine",
+			"group":         "production",
+			"class":         "email-delivery",
 			"custom_details": alert.Data,
 		},
 	}
 
 	data, _ := json.Marshal(payload)
-	http.Post("https://events.pagerduty.com/v2/enqueue", 
+	http.Post("https://events.pagerduty.com/v2/enqueue",
 		"application/json", bytes.NewBuffer(data))
 }
 
@@ -109,7 +109,6 @@ func sendEmailAlert(alert Alert) {
 	if len(alertConfig.EmailAlertsTo) == 0 {
 		return
 	}
-
 	// Use your email engine to send alert
 	// This would call your email dispatch system
 }
@@ -165,11 +164,11 @@ func AlertProviderFailure(provider string, err error) {
 
 func AlertRateLimitHit(userID string, limit int) {
 	SendAlert(Alert{
-		ID:      fmt.Sprintf("rate-limit-%s", userID),
-		Title:   "Rate Limit Exceeded",
-		Message: fmt.Sprintf("User %s exceeded rate limit of %d", userID, limit),
+		ID:       fmt.Sprintf("rate-limit-%s", userID),
+		Title:    "Rate Limit Exceeded",
+		Message:  fmt.Sprintf("User %s exceeded rate limit of %d", userID, limit),
 		Severity: "info",
-		Tags:    []string{"rate-limit", "user"},
+		Tags:     []string{"rate-limit", "user"},
 		Data: map[string]interface{}{
 			"user_id": userID,
 			"limit":   limit,

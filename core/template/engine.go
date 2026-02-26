@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/md5"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"os"
@@ -99,12 +100,12 @@ func GetEngine() *TemplateEngine {
 func ProcessTemplateFile(action string, data map[string]interface{}) (subject, htmlBody string, err error) {
 	e := GetEngine()
 	subject = getDefaultSubject(action)
-	
+
 	htmlBody, err = e.renderFileTemplate(action+".html", data)
 	if err != nil {
 		return "", "", err
 	}
-	
+
 	return subject, htmlBody, nil
 }
 
@@ -113,9 +114,9 @@ func (e *TemplateEngine) renderFileTemplate(filename string, data map[string]int
 	e.mu.RLock()
 	cached, exists := e.cache[filename]
 	e.mu.RUnlock()
-	
+
 	filePath := filepath.Join(templateDir, filename)
-	
+
 	if exists {
 		cached.LastUsed = time.Now()
 		var buf bytes.Buffer
@@ -125,13 +126,13 @@ func (e *TemplateEngine) renderFileTemplate(filename string, data map[string]int
 		}
 		monitoring.Warn("Template %s execution failed, reloading: %v", filename, err)
 	}
-	
+
 	// ফাইল থেকে টেমপ্লেট লোড
 	tmpl, err := template.New(filename).Funcs(e.functions).ParseFiles(filePath)
 	if err != nil {
 		return "", err
 	}
-	
+
 	// হ্যাশ ক্যালকুলেট
 	content, err := os.ReadFile(filePath)
 	if err != nil {
@@ -139,7 +140,7 @@ func (e *TemplateEngine) renderFileTemplate(filename string, data map[string]int
 	}
 	hash := md5.Sum(content)
 	hashStr := hex.EncodeToString(hash[:])
-	
+
 	// ক্যাশে রাখুন
 	e.mu.Lock()
 	e.cache[filename] = &CachedTemplate{
@@ -149,7 +150,7 @@ func (e *TemplateEngine) renderFileTemplate(filename string, data map[string]int
 		CreatedAt: time.Now(),
 	}
 	e.mu.Unlock()
-	
+
 	// Redis-এ ক্যাশ
 	go func() {
 		cacheData := map[string]interface{}{
@@ -158,20 +159,20 @@ func (e *TemplateEngine) renderFileTemplate(filename string, data map[string]int
 		}
 		database.RedisClient.Set(context.Background(), "template:"+filename, cacheData, time.Hour*24)
 	}()
-	
+
 	var buf bytes.Buffer
 	err = tmpl.Execute(&buf, e.prepareData(data))
 	if err != nil {
 		return "", err
 	}
-	
+
 	return buf.String(), nil
 }
 
 // prepareData ডাটা প্রস্তুত করে
 func (e *TemplateEngine) prepareData(data map[string]interface{}) TemplateData {
 	now := time.Now()
-	
+
 	tplData := TemplateData{
 		User:      make(map[string]interface{}),
 		App:       make(map[string]interface{}),
@@ -179,17 +180,17 @@ func (e *TemplateEngine) prepareData(data map[string]interface{}) TemplateData {
 		Timestamp: now,
 		Year:      now.Year(),
 	}
-	
+
 	if user, ok := data["user"].(map[string]interface{}); ok {
 		tplData.User = user
 		delete(data, "user")
 	}
-	
+
 	if app, ok := data["app"].(map[string]interface{}); ok {
 		tplData.App = app
 		delete(data, "app")
 	}
-	
+
 	return tplData
 }
 
@@ -197,7 +198,7 @@ func (e *TemplateEngine) prepareData(data map[string]interface{}) TemplateData {
 func (e *TemplateEngine) cleanupCache() {
 	ticker := time.NewTicker(time.Hour)
 	defer ticker.Stop()
-	
+
 	for range ticker.C {
 		e.mu.Lock()
 		for name, cached := range e.cache {
@@ -219,7 +220,7 @@ func getDefaultSubject(action string) string {
 		"invoice":        "Your Invoice",
 		"notification":   "New Notification",
 	}
-	
+
 	if subject, ok := subjects[action]; ok {
 		return subject
 	}
@@ -229,22 +230,22 @@ func getDefaultSubject(action string) string {
 // GetFileTemplate ফাইল টেমপ্লেট রিটার্ন করে (manager-এর জন্য)
 func (e *TemplateEngine) GetFileTemplate(action string) (*template.Template, error) {
 	cacheKey := action + ".html"
-	
+
 	e.mu.RLock()
 	cached, exists := e.cache[cacheKey]
 	e.mu.RUnlock()
-	
+
 	if exists {
 		return cached.Template, nil
 	}
-	
+
 	// ফাইল থেকে লোড করুন
 	filePath := filepath.Join(templateDir, action+".html")
 	tmpl, err := template.New(action+".html").Funcs(e.functions).ParseFiles(filePath)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return tmpl, nil
 }
 
