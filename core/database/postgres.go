@@ -49,6 +49,7 @@ func InitPostgres(config *PostgresConfig) error {
 	return nil
 }
 
+// postgres.go – fixed table creation (only the relevant part)
 func createTables() error {
 	queries := []string{
 		`CREATE TABLE IF NOT EXISTS users (
@@ -76,11 +77,11 @@ func createTables() error {
 			created_at TIMESTAMP DEFAULT NOW(),
 			updated_at TIMESTAMP DEFAULT NOW(),
 			completed_at TIMESTAMP,
-			error TEXT,
-			INDEX idx_user_id (user_id),
-			INDEX idx_status (status),
-			INDEX idx_scheduled_at (scheduled_at)
+			error TEXT
 		)`,
+		`CREATE INDEX IF NOT EXISTS idx_email_jobs_user_id ON email_jobs(user_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_email_jobs_status ON email_jobs(status)`,
+		`CREATE INDEX IF NOT EXISTS idx_email_jobs_scheduled ON email_jobs(scheduled_at) WHERE status = 'pending'`,
 
 		`CREATE TABLE IF NOT EXISTS email_history (
 			id SERIAL PRIMARY KEY,
@@ -97,10 +98,10 @@ func createTables() error {
 			clicked_at TIMESTAMP,
 			bounced_at TIMESTAMP,
 			complained_at TIMESTAMP,
-			created_at TIMESTAMP DEFAULT NOW(),
-			INDEX idx_user_id (user_id),
-			INDEX idx_created_at (created_at)
+			created_at TIMESTAMP DEFAULT NOW()
 		)`,
+		`CREATE INDEX IF NOT EXISTS idx_email_history_user_id ON email_history(user_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_email_history_created_at ON email_history(created_at)`,
 
 		`CREATE TABLE IF NOT EXISTS templates (
 			id VARCHAR(255) PRIMARY KEY,
@@ -114,9 +115,9 @@ func createTables() error {
 			is_active BOOLEAN DEFAULT true,
 			created_by VARCHAR(255),
 			created_at TIMESTAMP DEFAULT NOW(),
-			updated_at TIMESTAMP DEFAULT NOW(),
-			INDEX idx_action (action)
+			updated_at TIMESTAMP DEFAULT NOW()
 		)`,
+		`CREATE INDEX IF NOT EXISTS idx_templates_action ON templates(action)`,
 
 		`CREATE TABLE IF NOT EXISTS webhooks (
 			id VARCHAR(255) PRIMARY KEY,
@@ -126,9 +127,9 @@ func createTables() error {
 			secret VARCHAR(255),
 			is_active BOOLEAN DEFAULT true,
 			created_at TIMESTAMP DEFAULT NOW(),
-			updated_at TIMESTAMP DEFAULT NOW(),
-			INDEX idx_user_id (user_id)
+			updated_at TIMESTAMP DEFAULT NOW()
 		)`,
+		`CREATE INDEX IF NOT EXISTS idx_webhooks_user_id ON webhooks(user_id)`,
 
 		`CREATE TABLE IF NOT EXISTS rate_limits (
 			user_id VARCHAR(255) PRIMARY KEY,
@@ -142,9 +143,9 @@ func createTables() error {
 			email VARCHAR(255) PRIMARY KEY,
 			reason VARCHAR(100),
 			source VARCHAR(50),
-			created_at TIMESTAMP DEFAULT NOW(),
-			INDEX idx_email (email)
+			created_at TIMESTAMP DEFAULT NOW()
 		)`,
+		`CREATE INDEX IF NOT EXISTS idx_suppression_email ON suppression_list(email)`,
 
 		`CREATE TABLE IF NOT EXISTS analytics (
 			date DATE PRIMARY KEY,
@@ -167,7 +168,6 @@ func createTables() error {
 			return err
 		}
 	}
-
 	return nil
 }
 

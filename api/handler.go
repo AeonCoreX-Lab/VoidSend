@@ -11,6 +11,9 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// EngineInstance – global reference to the engine (set by main)
+var EngineInstance *engine.UltraEngine
+
 // DispatchRequest – সাধারণ ডিসপ্যাচ রিকোয়েস্ট
 type DispatchRequest struct {
 	UserID      string                 `json:"user_id" binding:"required"`
@@ -30,21 +33,17 @@ func HandleUltraDispatch(c *gin.Context) {
 		return
 	}
 
-	// ডেভেলপার আইডি (API key middleware থেকে)
 	devID, _ := c.Get("developer_id")
 	devIDStr, _ := devID.(string)
 
-	// ইউজারের ইমেইল বের করি
 	userEmail, err := database.GetUserEmail(c.Request.Context(), req.UserID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
 	}
 
-	// টেমপ্লেট প্রসেস করি (ডাটাবেজ বা ফাইল)
 	subject, htmlBody, err := template.ProcessTemplate(devIDStr, req.Action, req.Data)
 	if err != nil {
-		// ব্যাকআপ হিসেবে ফাইল টেমপ্লেট
 		subject, htmlBody, err = template.ProcessTemplateFile(req.Action, req.Data)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Template error: " + err.Error()})
@@ -52,14 +51,13 @@ func HandleUltraDispatch(c *gin.Context) {
 		}
 	}
 
-	// ইঞ্জিন জব তৈরি
 	job := &engine.DispatchJob{
 		UserID:      req.UserID,
 		ToEmail:     userEmail,
 		Action:      req.Action,
 		Subject:     subject,
 		HTMLBody:    htmlBody,
-		TextBody:    "", // যদি চাই textBody আলাদা করে generate করতে পারেন
+		TextBody:    "",
 		Data:        req.Data,
 		Priority:    req.Priority,
 		ScheduledAt: req.ScheduledAt,
@@ -67,7 +65,6 @@ func HandleUltraDispatch(c *gin.Context) {
 		Tags:        req.Tags,
 	}
 
-	// ইঞ্জিনে পাঠাই
 	if err := EngineInstance.Dispatch(job); err != nil {
 		monitoring.Error("Dispatch failed: %v", err)
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": err.Error()})
@@ -87,7 +84,6 @@ type BatchDispatchRequest struct {
 	Jobs []DispatchRequest `json:"jobs" binding:"required,min=1,max=100"`
 }
 
-// HandleBatchDispatch – একাধিক ইমেইল ডিসপ্যাচ
 func HandleBatchDispatch(c *gin.Context) {
 	var req BatchDispatchRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -102,7 +98,6 @@ func HandleBatchDispatch(c *gin.Context) {
 	results := make([]map[string]interface{}, len(req.Jobs))
 
 	for i, j := range req.Jobs {
-		// ইউজার ইমেইল
 		userEmail, err := database.GetUserEmail(c.Request.Context(), j.UserID)
 		if err != nil {
 			results[i] = map[string]interface{}{
@@ -113,7 +108,6 @@ func HandleBatchDispatch(c *gin.Context) {
 			continue
 		}
 
-		// টেমপ্লেট প্রসেস
 		subject, htmlBody, err := template.ProcessTemplate(devIDStr, j.Action, j.Data)
 		if err != nil {
 			subject, htmlBody, err = template.ProcessTemplateFile(j.Action, j.Data)
@@ -147,7 +141,6 @@ func HandleBatchDispatch(c *gin.Context) {
 		}
 	}
 
-	// ব্যাচ ডিসপ্যাচ
 	errs := EngineInstance.BatchDispatch(jobs)
 	for i, err := range errs {
 		if err != nil {
@@ -174,7 +167,6 @@ type ScheduleRequest struct {
 	EndAt      *time.Time             `json:"end_at"`
 }
 
-// HandleScheduledDispatch – schedule ডিসপ্যাচ
 func HandleScheduledDispatch(c *gin.Context) {
 	var req ScheduleRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -219,7 +211,6 @@ func HandleScheduledDispatch(c *gin.Context) {
 		return
 	}
 
-	// যদি repeat দেওয়া থাকে, ডাটাবেজে সংরক্ষণ
 	if req.Repeat != "" {
 		// TODO: recurring schedule সংরক্ষণ করুন
 	}
@@ -232,7 +223,7 @@ func HandleScheduledDispatch(c *gin.Context) {
 	})
 }
 
-// Webhook handlers (same as before)
+// Webhook handlers
 func HandleStatusWebhook(c *gin.Context) {
 	var payload struct {
 		Event     string `json:"event"`
@@ -245,7 +236,6 @@ func HandleStatusWebhook(c *gin.Context) {
 		return
 	}
 	monitoring.Info("Webhook received: %s for %s", payload.Event, payload.MessageID)
-	// TODO: update delivery status
 	c.JSON(http.StatusOK, gin.H{"status": "received"})
 }
 
@@ -262,6 +252,5 @@ func HandleBounceWebhook(c *gin.Context) {
 		return
 	}
 	monitoring.Warn("Bounce received: %s - %s", payload.Email, payload.Reason)
-	// TODO: add to suppression list
 	c.JSON(http.StatusOK, gin.H{"status": "processed"})
 }

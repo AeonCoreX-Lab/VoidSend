@@ -3,18 +3,15 @@ package utils
 import (
 	"crypto/rand"
 	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math"
 	"net"
+	"net/http"   // added
 	"net/url"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
-
-	"github.com/google/uuid"
 )
 
 // GenerateRandomString generates a random string of given length
@@ -59,7 +56,6 @@ func PrettyJSON(data interface{}) string {
 
 // GetClientIP extracts real client IP from request
 func GetClientIP(r *http.Request) string {
-	// Check X-Forwarded-For
 	forwarded := r.Header.Get("X-Forwarded-For")
 	if forwarded != "" {
 		ips := strings.Split(forwarded, ",")
@@ -67,13 +63,9 @@ func GetClientIP(r *http.Request) string {
 			return strings.TrimSpace(ips[0])
 		}
 	}
-
-	// Check X-Real-IP
 	if realIP := r.Header.Get("X-Real-IP"); realIP != "" {
 		return realIP
 	}
-
-	// Get remote address
 	ip, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
 		return r.RemoteAddr
@@ -91,21 +83,12 @@ func TruncateString(s string, max int) string {
 
 // Slugify creates URL-friendly slug
 func Slugify(s string) string {
-	// Convert to lowercase
 	s = strings.ToLower(s)
-
-	// Replace spaces with hyphens
 	s = strings.ReplaceAll(s, " ", "-")
-
-	// Remove special characters
 	reg := regexp.MustCompile("[^a-z0-9-]+")
 	s = reg.ReplaceAllString(s, "")
-
-	// Remove multiple hyphens
 	reg = regexp.MustCompile("-+")
 	s = reg.ReplaceAllString(s, "-")
-
-	// Trim hyphens
 	return strings.Trim(s, "-")
 }
 
@@ -143,14 +126,11 @@ func Paginate(page, limit, total int) map[string]interface{} {
 	if limit > 100 {
 		limit = 100
 	}
-
 	totalPages := (total + limit - 1) / limit
 	if totalPages < 1 {
 		totalPages = 1
 	}
-
 	offset := (page - 1) * limit
-
 	return map[string]interface{}{
 		"page":       page,
 		"limit":      limit,
@@ -220,7 +200,7 @@ func Retry(attempts int, sleep time.Duration, fn func() error) error {
 			return nil
 		}
 		time.Sleep(sleep)
-		sleep *= 2 // Exponential backoff
+		sleep *= 2
 	}
 	return err
 }

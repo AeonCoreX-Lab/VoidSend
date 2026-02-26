@@ -13,8 +13,7 @@ import (
 
 var (
 	logger *logrus.Logger
-	
-	// Prometheus metrics
+
 	jobsProcessed = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "voidsend_jobs_processed_total",
@@ -22,7 +21,7 @@ var (
 		},
 		[]string{"status", "provider"},
 	)
-	
+
 	jobDuration = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name:    "voidsend_job_duration_seconds",
@@ -31,21 +30,21 @@ var (
 		},
 		[]string{"action"},
 	)
-	
+
 	activeJobs = prometheus.NewGauge(
 		prometheus.GaugeOpts{
 			Name: "voidsend_active_jobs",
 			Help: "Number of active jobs",
 		},
 	)
-	
+
 	queueSize = prometheus.NewGauge(
 		prometheus.GaugeOpts{
 			Name: "voidsend_queue_size",
 			Help: "Current queue size",
 		},
 	)
-	
+
 	rateLimitHits = prometheus.NewCounter(
 		prometheus.CounterOpts{
 			Name: "voidsend_rate_limit_hits_total",
@@ -59,13 +58,11 @@ type Metrics struct {
 }
 
 func init() {
-	// Initialize logger
 	logger = logrus.New()
 	logger.SetFormatter(&logrus.JSONFormatter{
 		TimestampFormat: time.RFC3339Nano,
 	})
-	
-	// Register Prometheus metrics
+
 	prometheus.MustRegister(jobsProcessed)
 	prometheus.MustRegister(jobDuration)
 	prometheus.MustRegister(activeJobs)
@@ -79,8 +76,7 @@ func InitLogger(level string) {
 		lvl = logrus.InfoLevel
 	}
 	logger.SetLevel(lvl)
-	
-	// Add hooks for external services
+
 	if dsn := os.Getenv("SENTRY_DSN"); dsn != "" {
 		// Add Sentry hook
 	}
@@ -94,10 +90,8 @@ func (m *Metrics) Start(port string) {
 	if !m.enabled {
 		return
 	}
-	
 	r := gin.Default()
 	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
-	
 	go func() {
 		if err := r.Run(":" + port); err != nil {
 			log.Printf("Metrics server error: %v", err)
@@ -135,7 +129,8 @@ func Fatal(format string, args ...interface{}) {
 	logger.Fatalf(format, args...)
 }
 
-func Alert(message string, fields map[string]interface{}) {
+// LogAlert – renamed from Alert to avoid conflict with alerts.go struct
+func LogAlert(message string, fields map[string]interface{}) {
 	logger.WithFields(fields).Error(message)
 	// Send to alerting system (PagerDuty, OpsGenie, etc.)
 }
@@ -167,12 +162,12 @@ func LoggerMiddleware() gin.HandlerFunc {
 		start := time.Now()
 		path := c.Request.URL.Path
 		method := c.Request.Method
-		
+
 		c.Next()
-		
+
 		latency := time.Since(start)
 		status := c.Writer.Status()
-		
+
 		logger.WithFields(logrus.Fields{
 			"status":     status,
 			"method":     method,
