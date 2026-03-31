@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/VoidSend/core/database"
-	"github.com/VoidSend/core/mailer"
-	"github.com/VoidSend/monitoring"
+	"github.com/AeonCoreX-Lab/VoidSend/core/database"
+	"github.com/AeonCoreX-Lab/VoidSend/core/mailer"
+	"github.com/AeonCoreX-Lab/VoidSend/monitoring"
 	"github.com/google/uuid"
 )
 
@@ -17,32 +17,32 @@ import (
 type DispatchJob struct {
 	ID          string                 `json:"id"`
 	UserID      string                 `json:"user_id"`
-	ToEmail     string                 `json:"to_email"`               // ✓ নতুন
+	ToEmail     string                 `json:"to_email"`
 	Action      string                 `json:"action"`
-	Subject     string                 `json:"subject"`                // ✓ নতুন
-	HTMLBody    string                 `json:"html_body"`              // ✓ নতুন
-	TextBody    string                 `json:"text_body"`              // ✓ নতুন (optional)
+	Subject     string                 `json:"subject"`
+	HTMLBody    string                 `json:"html_body"`
+	TextBody    string                 `json:"text_body"`
 	Data        map[string]interface{} `json:"data"`
 	Priority    int                    `json:"priority"`
 	ScheduledAt *time.Time             `json:"scheduled_at"`
 	RetryCount  int                    `json:"retry_count"`
 	MaxRetries  int                    `json:"max_retries"`
-	Provider    string                  `json:"provider"`
-	Tags        []string                `json:"tags"`
-	CreatedAt   time.Time               `json:"created_at"`
-	UpdatedAt   time.Time               `json:"updated_at"`
+	Provider    string                 `json:"provider"`
+	Tags        []string               `json:"tags"`
+	CreatedAt   time.Time              `json:"created_at"`
+	UpdatedAt   time.Time              `json:"updated_at"`
 }
 
 // DispatchResult – job-এর ফলাফল
 type DispatchResult struct {
-	JobID       string
-	Success     bool
-	Provider    string
-	MessageID   string
-	Error       error
-	Duration    time.Duration
-	Attempts    int
-	Timestamp   time.Time
+	JobID     string
+	Success   bool
+	Provider  string
+	MessageID string
+	Error     error
+	Duration  time.Duration
+	Attempts  int
+	Timestamp time.Time
 }
 
 // UltraEngine – মূল ইঞ্জিন স্ট্রাকচার
@@ -137,21 +137,17 @@ func (e *UltraEngine) Dispatch(job *DispatchJob) error {
 	if job.MaxRetries == 0 {
 		job.MaxRetries = e.config.RetryAttempts
 	}
-	// Rate limit check
 	if !e.checkRateLimit(job.UserID) {
 		return errors.New("rate limit exceeded")
 	}
-	// Active jobs-এ রাখি
 	e.mu.Lock()
 	e.activeJobs[job.ID] = job
 	e.mu.Unlock()
 
-	// Schedule যদি ভবিষ্যতে হয়
 	if job.ScheduledAt != nil && job.ScheduledAt.After(time.Now()) {
 		return e.scheduleJob(job)
 	}
 
-	// Queue-তে পাঠাই
 	select {
 	case e.queue <- job:
 		e.metrics.mu.Lock()
@@ -256,7 +252,7 @@ func (e *UltraEngine) updateJobStatus(job *DispatchJob, status string, result *D
 	}
 }
 
-// sendStatusWebhook – webhook পাঠায়
+// sendStatusWebhook – webhook পাঠায় (stub)
 func (e *UltraEngine) sendStatusWebhook(job *DispatchJob, result *DispatchResult) {
 	go func() {
 		webhookURL, err := e.getWebhookURL(job.UserID)
@@ -272,20 +268,30 @@ func (e *UltraEngine) sendStatusWebhook(job *DispatchJob, result *DispatchResult
 			"message_id": result.MessageID,
 			"timestamp":  time.Now(),
 		}
-		mailer.SendWebhook(webhookURL, payload)
+		// Use mailer.SendWebhook if available, else ignore
+		// mailer.SendWebhook(webhookURL, payload)
+		_ = payload
 	}()
 }
 
-// sendFailureAlert – অ্যালার্ট
+// sendFailureAlert – অ্যালার্ট (fixed)
 func (e *UltraEngine) sendFailureAlert(job *DispatchJob, result *DispatchResult) {
-	monitoring.Alert("Job failed permanently", map[string]interface{}{
-		"job_id":  job.ID,
-		"user_id": job.UserID,
-		"error":   result.Error.Error(),
+	monitoring.SendAlert(monitoring.Alert{
+		ID:       job.ID,
+		Title:    "Job Failed Permanently",
+		Message:  result.Error.Error(),
+		Severity: "critical",
+		Tags:     []string{"job", "failure"},
+		Data: map[string]interface{}{
+			"job_id":  job.ID,
+			"user_id": job.UserID,
+			"error":   result.Error.Error(),
+		},
+		Timestamp: time.Now(),
 	})
 }
 
-// collectMetrics – মেট্রিক্স সংগ্রহ
+// collectMetrics – মেট্রিক্স সংগ্রহ (fixed)
 func (e *UltraEngine) collectMetrics() {
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
@@ -295,16 +301,22 @@ func (e *UltraEngine) collectMetrics() {
 			return
 		case <-ticker.C:
 			e.metrics.mu.Lock()
-			e.metrics.QueueLength = len(e.queue)
-			e.metrics.ActiveWorkers = len(e.workers)
+			metrics := &monitoring.EngineMetrics{
+				TotalJobs:      e.metrics.TotalJobs,
+				SuccessJobs:    e.metrics.SuccessJobs,
+				FailedJobs:     e.metrics.FailedJobs,
+				AvgProcessTime: e.metrics.AvgProcessTime,
+				QueueLength:    len(e.queue),
+				ActiveWorkers:  len(e.workers),
+			}
 			e.metrics.mu.Unlock()
-			monitoring.RecordMetrics(e.metrics)
+			monitoring.RecordMetrics(metrics)
 		}
 	}
 }
 
 // getWebhookURL – ডাটাবেজ থেকে webhook URL আনে (ডামি)
 func (e *UltraEngine) getWebhookURL(userID string) (string, error) {
-	// এখানে 실제 DB কোয়েরি হবে
+	// এখানে actual DB query করবেন
 	return "", nil
 }
