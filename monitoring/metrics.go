@@ -14,6 +14,7 @@ import (
 var (
 	logger *logrus.Logger
 
+	// Prometheus metrics
 	jobsProcessed = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "voidsend_jobs_processed_total",
@@ -53,10 +54,12 @@ var (
 	)
 )
 
+// Metrics is a wrapper for enabling/disabling metrics server
 type Metrics struct {
 	enabled bool
 }
 
+// EngineMetrics holds metrics collected from the engine
 type EngineMetrics struct {
 	TotalJobs      int64
 	SuccessJobs    int64
@@ -79,6 +82,7 @@ func init() {
 	prometheus.MustRegister(rateLimitHits)
 }
 
+// InitLogger sets the log level and optional Sentry hook
 func InitLogger(level string) {
 	lvl, err := logrus.ParseLevel(level)
 	if err != nil {
@@ -87,14 +91,16 @@ func InitLogger(level string) {
 	logger.SetLevel(lvl)
 
 	if dsn := os.Getenv("SENTRY_DSN"); dsn != "" {
-		// Add Sentry hook
+		// Add Sentry hook (optional)
 	}
 }
 
+// NewMetrics creates a new Metrics instance
 func NewMetrics(enabled bool) *Metrics {
 	return &Metrics{enabled: enabled}
 }
 
+// Start runs the metrics HTTP server (if enabled)
 func (m *Metrics) Start(port string) {
 	if !m.enabled {
 		return
@@ -108,6 +114,7 @@ func (m *Metrics) Start(port string) {
 	}()
 }
 
+// Handler returns a Gin handler for the /metrics endpoint
 func (m *Metrics) Handler() gin.HandlerFunc {
 	if !m.enabled {
 		return func(c *gin.Context) {
@@ -138,10 +145,9 @@ func Fatal(format string, args ...interface{}) {
 	logger.Fatalf(format, args...)
 }
 
-// LogAlert – renamed from Alert to avoid conflict with alerts.go struct
+// LogAlert logs an alert with fields (avoid name conflict with alerts.go)
 func LogAlert(message string, fields map[string]interface{}) {
 	logger.WithFields(fields).Error(message)
-	// Send to alerting system (PagerDuty, OpsGenie, etc.)
 }
 
 // Metrics recording
@@ -165,14 +171,14 @@ func IncRateLimitHit() {
 	rateLimitHits.Inc()
 }
 
-// ADDED: RecordMetrics function to record engine metrics
+// RecordMetrics records engine-wide metrics
 func RecordMetrics(metrics *EngineMetrics) {
 	SetActiveJobs(metrics.ActiveWorkers)
 	SetQueueSize(metrics.QueueLength)
-	// You can also record other metrics as gauges if needed
+	// Additional metrics can be recorded here if needed
 }
 
-// Middleware
+// LoggerMiddleware is a Gin middleware that logs each request
 func LoggerMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
