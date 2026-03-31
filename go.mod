@@ -1,4 +1,4 @@
-module github.com/VoidSend
+module github.com/AeonCoreX-Lab/VoidSend
 
 go 1.23
 
