@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v4/pgxpool"
-	"github.com/VoidSend/monitoring"
+	"github.com/AeonCoreX-Lab/VoidSend/monitoring"
 )
 
 var PostgresPool *pgxpool.Pool
