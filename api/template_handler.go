@@ -2,7 +2,6 @@ package api
 
 import (
 	"net/http"
-	"time"
 
 	"github.com/AeonCoreX-Lab/VoidSend/core/template"
 	"github.com/AeonCoreX-Lab/VoidSend/monitoring"
