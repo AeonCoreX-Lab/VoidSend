@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/VoidSend/core/database"
-	"github.com/VoidSend/monitoring"
+	"github.com/AeonCoreX-Lab/VoidSend/core/database"
+	"github.com/AeonCoreX-Lab/VoidSend/monitoring"
 )
 
 // TemplateCacheEntry ক্যাশে রাখা টেমপ্লেটের এন্ট্রি
