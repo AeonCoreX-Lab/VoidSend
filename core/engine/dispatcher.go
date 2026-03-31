@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/AeonCoreX-Lab/VoidSend/core/database"
-	"github.com/AeonCoreX-Lab/VoidSend/core/mailer"
 	"github.com/AeonCoreX-Lab/VoidSend/monitoring"
 	"github.com/google/uuid"
 )
