@@ -5,8 +5,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/VoidSend/core/mailer"
-	"github.com/VoidSend/monitoring"
+	"github.com/AeonCoreX-Lab/VoidSend/core/mailer"
+	"github.com/AeonCoreX-Lab/VoidSend/monitoring"
 )
 
 type Worker struct {
