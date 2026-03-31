@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/VoidSend/core/database"
-	"github.com/VoidSend/monitoring"
+	"github.com/AeonCoreX-Lab/VoidSend/core/database"
+	"github.com/AeonCoreX-Lab/VoidSend/monitoring"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
