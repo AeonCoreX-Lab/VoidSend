@@ -4,10 +4,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/VoidSend/core/database"
-	"github.com/VoidSend/core/engine"
-	"github.com/VoidSend/core/template"
-	"github.com/VoidSend/monitoring"
+	"github.com/AeonCoreX-Lab/VoidSend/core/database"
+	"github.com/AeonCoreX-Lab/VoidSend/core/engine"
+	"github.com/AeonCoreX-Lab/VoidSend/core/template"
+	"github.com/AeonCoreX-Lab/VoidSend/monitoring"
 	"github.com/gin-gonic/gin"
 )
 
