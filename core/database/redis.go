@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/go-redis/redis/v8"
-	"github.com/VoidSend/monitoring"
+	"github.com/AeonCoreX-Lab/VoidSend/monitoring"
 )
 
 var RedisClient *redis.Client
@@ -92,7 +92,7 @@ func RateLimitCheck(ctx context.Context, key string, limit int, window time.Dura
 	windowStart := now - window.Nanoseconds()
 
 	// Remove old entries
-	RedisClient.ZRemRangeByScore(ctx, "rate:"+key, "0", string(windowStart))
+	RedisClient.ZRemRangeByScore(ctx, "rate:"+key, "0", string(rune(windowStart)))
 
 	// Add current request
 	RedisClient.ZAdd(ctx, "rate:"+key, &redis.Z{
@@ -148,8 +148,9 @@ func SetAdd(ctx context.Context, key string, members ...interface{}) error {
 	return RedisClient.SAdd(ctx, "set:"+key, members...).Err()
 }
 
+// FIXED: Removed the stray quote that was causing syntax error
 func SetMembers(ctx context.Context, key string) ([]string, error) {
-	return RedisClient.SMembers(ctx, "set:"+key").Result()
+	return RedisClient.SMembers(ctx, "set:"+key).Result()
 }
 
 // Sorted Sets for Scheduling
@@ -163,7 +164,7 @@ func ScheduleAdd(ctx context.Context, key string, score float64, member interfac
 func ScheduleGetDue(ctx context.Context, key string, maxScore float64) ([]string, error) {
 	return RedisClient.ZRangeByScore(ctx, "schedule:"+key, &redis.ZRangeBy{
 		Min: "-inf",
-		Max: string(maxScore),
+		Max: string(rune(maxScore)),
 	}).Result()
 }
 

@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"encoding/json"   // added
 	"net"
 	"regexp"
 	"strings"
@@ -9,7 +10,6 @@ import (
 
 // IsValidEmail checks if email format is valid
 func IsValidEmail(email string) bool {
-	// Simple regex, but in production use proper validation
 	pattern := `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`
 	matched, _ := regexp.MatchString(pattern, email)
 	return matched
@@ -17,7 +17,6 @@ func IsValidEmail(email string) bool {
 
 // IsValidPhone validates phone number (basic)
 func IsValidPhone(phone string) bool {
-	// Basic: only digits, length 10-15
 	pattern := `^\+?[0-9]{10,15}$`
 	matched, _ := regexp.MatchString(pattern, phone)
 	return matched

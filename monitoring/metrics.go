@@ -13,7 +13,7 @@ import (
 
 var (
 	logger *logrus.Logger
-	
+
 	// Prometheus metrics
 	jobsProcessed = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
@@ -22,7 +22,7 @@ var (
 		},
 		[]string{"status", "provider"},
 	)
-	
+
 	jobDuration = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name:    "voidsend_job_duration_seconds",
@@ -31,21 +31,21 @@ var (
 		},
 		[]string{"action"},
 	)
-	
+
 	activeJobs = prometheus.NewGauge(
 		prometheus.GaugeOpts{
 			Name: "voidsend_active_jobs",
 			Help: "Number of active jobs",
 		},
 	)
-	
+
 	queueSize = prometheus.NewGauge(
 		prometheus.GaugeOpts{
 			Name: "voidsend_queue_size",
 			Help: "Current queue size",
 		},
 	)
-	
+
 	rateLimitHits = prometheus.NewCounter(
 		prometheus.CounterOpts{
 			Name: "voidsend_rate_limit_hits_total",
@@ -54,18 +54,27 @@ var (
 	)
 )
 
+// Metrics is a wrapper for enabling/disabling metrics server
 type Metrics struct {
 	enabled bool
 }
 
+// EngineMetrics holds metrics collected from the engine
+type EngineMetrics struct {
+	TotalJobs      int64
+	SuccessJobs    int64
+	FailedJobs     int64
+	AvgProcessTime time.Duration
+	QueueLength    int
+	ActiveWorkers  int
+}
+
 func init() {
-	// Initialize logger
 	logger = logrus.New()
 	logger.SetFormatter(&logrus.JSONFormatter{
 		TimestampFormat: time.RFC3339Nano,
 	})
-	
-	// Register Prometheus metrics
+
 	prometheus.MustRegister(jobsProcessed)
 	prometheus.MustRegister(jobDuration)
 	prometheus.MustRegister(activeJobs)
@@ -73,31 +82,31 @@ func init() {
 	prometheus.MustRegister(rateLimitHits)
 }
 
+// InitLogger sets the log level and optional Sentry hook
 func InitLogger(level string) {
 	lvl, err := logrus.ParseLevel(level)
 	if err != nil {
 		lvl = logrus.InfoLevel
 	}
 	logger.SetLevel(lvl)
-	
-	// Add hooks for external services
+
 	if dsn := os.Getenv("SENTRY_DSN"); dsn != "" {
-		// Add Sentry hook
+		// Add Sentry hook (optional)
 	}
 }
 
+// NewMetrics creates a new Metrics instance
 func NewMetrics(enabled bool) *Metrics {
 	return &Metrics{enabled: enabled}
 }
 
+// Start runs the metrics HTTP server (if enabled)
 func (m *Metrics) Start(port string) {
 	if !m.enabled {
 		return
 	}
-	
 	r := gin.Default()
 	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
-	
 	go func() {
 		if err := r.Run(":" + port); err != nil {
 			log.Printf("Metrics server error: %v", err)
@@ -105,6 +114,7 @@ func (m *Metrics) Start(port string) {
 	}()
 }
 
+// Handler returns a Gin handler for the /metrics endpoint
 func (m *Metrics) Handler() gin.HandlerFunc {
 	if !m.enabled {
 		return func(c *gin.Context) {
@@ -135,9 +145,9 @@ func Fatal(format string, args ...interface{}) {
 	logger.Fatalf(format, args...)
 }
 
-func Alert(message string, fields map[string]interface{}) {
+// LogAlert logs an alert with fields (avoid name conflict with alerts.go)
+func LogAlert(message string, fields map[string]interface{}) {
 	logger.WithFields(fields).Error(message)
-	// Send to alerting system (PagerDuty, OpsGenie, etc.)
 }
 
 // Metrics recording
@@ -161,18 +171,25 @@ func IncRateLimitHit() {
 	rateLimitHits.Inc()
 }
 
-// Middleware
+// RecordMetrics records engine-wide metrics
+func RecordMetrics(metrics *EngineMetrics) {
+	SetActiveJobs(metrics.ActiveWorkers)
+	SetQueueSize(metrics.QueueLength)
+	// Additional metrics can be recorded here if needed
+}
+
+// LoggerMiddleware is a Gin middleware that logs each request
 func LoggerMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
 		path := c.Request.URL.Path
 		method := c.Request.Method
-		
+
 		c.Next()
-		
+
 		latency := time.Since(start)
 		status := c.Writer.Status()
-		
+
 		logger.WithFields(logrus.Fields{
 			"status":     status,
 			"method":     method,

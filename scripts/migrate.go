@@ -6,7 +6,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/VoidSend/core/database"
+	"github.com/AeonCoreX-Lab/VoidSend/core/database"
 	"gopkg.in/yaml.v3"
 )
 

@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
-	"github.com/VoidSend/monitoring"
+	"github.com/AeonCoreX-Lab/VoidSend/monitoring"
 	"golang.org/x/crypto/bcrypt"
 )
 

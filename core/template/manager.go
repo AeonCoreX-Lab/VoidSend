@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/md5"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"html/template"
 	"os"
@@ -13,22 +12,22 @@ import (
 	"sync"
 	"time"
 
-	"github.com/VoidSend/core/database"
-	"github.com/VoidSend/monitoring"
+	"github.com/AeonCoreX-Lab/VoidSend/core/database"
+	"github.com/AeonCoreX-Lab/VoidSend/monitoring"
 	"github.com/google/uuid"
 )
 
 // TemplateManager ডাটাবেজ-ভিত্তিক টেমপ্লেট ম্যানেজমেন্ট handle করে
 type TemplateManager struct {
 	mu            sync.RWMutex
-	fileCache     map[string]*CachedTemplate    // ফাইল সিস্টেম থেকে লোড করা টেমপ্লেট
+	fileCache     map[string]*FileCacheEntry    // ফাইল সিস্টেম থেকে লোড করা টেমপ্লেট
 	dbCache       map[string]*DeveloperTemplate // ডাটাবেজ থেকে লোড করা টেমপ্লেট
 	fileEngine    *TemplateEngine                // ফাইল ইঞ্জিনের রেফারেন্স
 	functions     template.FuncMap
 	templateDir   string
 }
 
-type CachedTemplate struct {
+type FileCacheEntry struct {
 	Template  *template.Template
 	Hash      string
 	LastUsed  time.Time
@@ -56,7 +55,7 @@ var (
 func GetManager() *TemplateManager {
 	managerOnce.Do(func() {
 		manager = &TemplateManager{
-			fileCache:   make(map[string]*CachedTemplate),
+			fileCache:   make(map[string]*FileCacheEntry),
 			dbCache:     make(map[string]*DeveloperTemplate),
 			fileEngine:  GetEngine(), // ফাইল ইঞ্জিন ব্যবহার করবে
 			functions:   GetEngine().GetFunctions(), // একই functions ব্যবহার করবে
@@ -213,7 +212,7 @@ func (m *TemplateManager) getFromFile(action string) (*template.Template, string
 	
 	// ক্যাশে রাখুন
 	m.mu.Lock()
-	m.fileCache[action] = &CachedTemplate{
+	m.fileCache[action] = &FileCacheEntry{
 		Template: fileTmpl,
 		Hash:     hashStr,
 		LastUsed: time.Now(),
